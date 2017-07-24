@@ -10,7 +10,6 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Collection;
 
 /**
@@ -46,16 +45,8 @@ public class Sort extends AbstractMojo {
     }
 
     private void readAndSort(final File file) {
-        final SortedProperties properties = new SortedProperties();
-        try {
-            final boolean overwrite = properties.load(file);
-            if(overwrite) {
-                getLog().info("Writing sorted keys to file :" + file.getName());
-                properties.entrySet().stream().forEach(entry -> getLog().debug("Key -> " + entry.getKey() + " Value -> " + entry.getValue()));
-                properties.store(file);
-            }
-        } catch (final IOException fe) {
-            getLog().error(fe);
-        }
+        final SortedProperties properties = new SortedProperties(file, getLog());
+        getLog().info("Writing sorted keys to file :" + file.getName());
+        properties.store();
     }
 }

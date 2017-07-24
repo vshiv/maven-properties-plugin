@@ -1,51 +1,74 @@
 package com.brainplugs.mojo;
 
-import org.apache.commons.io.FileUtils;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.maven.plugin.logging.Log;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.Collections;
-import java.util.Enumeration;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.Properties;
+import java.util.TreeMap;
 
 /**
  * Class that extends {@link Properties} and overrides its key enumeration behavior
  */
-class SortedProperties extends Properties{
+class SortedProperties {
 
-    public Enumeration<Object> keys() {
-        final List<Object> keysList = Collections.list(super.keys());
-        Collections.sort(keysList , (o1, o2 ) -> o1.toString().compareTo(o2.toString()));
-        return Collections.enumeration(keysList);
-    }
+    private final File file;
+    private final Log LOG;
+    private final Map<String, CustomProperty> customProperties = new TreeMap<>();
+    private String separator;
 
-
-    boolean load(final File file) throws IOException {
-        final FileInputStream inputStream = FileUtils.openInputStream(file);
-        super.load(inputStream);
-        inputStream.close();
-        final List<String> lines = FileUtils.readLines(file);
-        final Optional<String> first = lines.stream().findFirst();
-        if(first.isPresent() && first.get().startsWith("#properties.maven.hash")){
-            final String hashLine = first.get();
-            final String[] lastHash = hashLine.split("=");
-            return lastHash.length == 2 && !lastHash[1].equalsIgnoreCase("" + this.hashCode());
+    SortedProperties(final File file, final Log log) {
+        this.file = file;
+        this.LOG = log;
+        try {
+            final PropertiesConfiguration.PropertiesReader reader = new PropertiesConfiguration.PropertiesReader(new FileReader(file));
+            this.separator = reader.getPropertySeparator();
+            while (reader.nextProperty()) {
+                final CustomProperty property = new CustomProperty(reader.getPropertyName(), reader.getPropertyValue(), reader.getCommentLines());
+                customProperties.putIfAbsent(property.key, property);
+            }
+            reader.close();
+        } catch (final IOException e) {
+            LOG.error("Error reading properties from file: " + file.getName(), e);
         }
-        return true;
     }
 
-    void store(final File file) throws IOException {
-       final FileOutputStream fileOutputStream = new FileOutputStream(file);
-       final PrintWriter writer = new PrintWriter(fileOutputStream);
-       writer.println("#properties.maven.hash=" + hashCode());
-       writer.flush();
-       super.store(fileOutputStream, null);
-       writer.close();
-       fileOutputStream.close();
+    private static class CustomProperty {
+
+        private final String key;
+        private final String value;
+        private final List<String> comments;
+
+        CustomProperty(final String key, final String value, final List<String> comments) {
+            this.key = key;
+            this.value = value;
+            this.comments = new ArrayList<>(comments);
+        }
+    }
+
+    void store() {
+        try {
+            final PropertiesConfiguration.PropertiesWriter writer = new PropertiesConfiguration.PropertiesWriter(new FileWriter(file), ',');
+            writer.setCurrentSeparator(separator);
+            for (final CustomProperty property : customProperties.values()) {
+                property.comments.forEach((comment) -> {
+                    try {
+                        writer.writeln(comment);
+                    } catch (final IOException e) {
+                        LOG.error("Error writing comments to file: " + file.getName(), e);
+                    }
+                });
+                writer.writeProperty(property.key, property.value);
+            }
+            writer.close();
+        } catch (final IOException e) {
+            LOG.error("Error writing properties to file : " + file.getName(), e);
+        }
     }
 }
