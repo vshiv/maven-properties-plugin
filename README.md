@@ -1,6 +1,12 @@
 # properties-maven-plugin
 Maven plugin that sorts i18n keys in resource files and warns users about missing and unused keys.    
 ### Basic plugin usage
+To sort keys just once add the plugin to your pom and run the following command
+````
+mvn properties:sort-keys
+````
+To run the plugin as part of your build lifecycle add the following to the plugin.
+
 ````
     <build>
         <plugins>
