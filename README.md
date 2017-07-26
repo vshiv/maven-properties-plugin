@@ -5,7 +5,7 @@ To sort keys just once add the plugin to your pom and run the following command
 ````
 mvn properties:sort-keys
 ````
-To run the plugin as part of your build lifecycle add the following to the plugin.
+To run the plugin as part of your build lifecycle add the following to the plugins section of the pom.
 
 ````
     <build>
